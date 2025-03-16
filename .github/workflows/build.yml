@@ -43,14 +43,14 @@ jobs:
         restore-keys: |
           obj-${{ runner.os }}-
 
-    - name: Build
-      run: dotnet build --no-restore
+    - name: Build MonoPhysics
+      run: dotnet build MonoPhysics/MonoPhysics.csproj --no-restore
 
-    - name: Publish
-      run: |
-        for project in $(find . -name '*.csproj'); do
-          dotnet publish $project -c Release -o ./publish/$(basename $project .csproj)
-        done
+    - name: Build MonoPhysics.Core.Tests
+      run: dotnet build MonoPhysics.Core.Tests/MonoPhysics.Core.Tests.csproj --no-restore
+
+    - name: Publish MonoPhysics
+      run: dotnet publish MonoPhysics/MonoPhysics.csproj -c Release -o ./publish/MonoPhysics
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4

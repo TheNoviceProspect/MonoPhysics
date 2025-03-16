@@ -31,7 +31,7 @@ jobs:
         path: ./publish
 
     - name: Test
-      run: dotnet test --no-build --verbosity normal --collect:"XPlat Code Coverage"
+      run: dotnet test MonoPhysics.Core.Tests/MonoPhysics.Core.Tests.csproj --no-build --verbosity normal --collect:"XPlat Code Coverage"
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
