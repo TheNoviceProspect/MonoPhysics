@@ -42,7 +42,7 @@ jobs:
         dotnet-version: 9.0.x
 
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore --runtime ${{ env.RUNTIME }}
 
     - name: Cache build artifacts
       uses: actions/cache@v4
@@ -53,7 +53,7 @@ jobs:
           obj-${{ runner.os }}-
 
     - name: Build MonoPhysics
-      run: dotnet build MonoPhysics/MonoPhysics.csproj --no-restore
+      run: dotnet build MonoPhysics/MonoPhysics.csproj --no-restore -c Release --runtime ${{ env.RUNTIME }}
 
     - name: Build MonoPhysics.Core.Tests
       run: dotnet build MonoPhysics.Core.Tests/MonoPhysics.Core.Tests.csproj --no-restore
