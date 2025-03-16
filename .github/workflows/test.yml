@@ -27,7 +27,7 @@ jobs:
     - name: Download artifact
       uses: actions/download-artifact@v4
       with:
-        name: published-app
+        name: published-app-${{ matrix.os }}
         path: ./publish
 
     - name: Test
@@ -47,4 +47,3 @@ jobs:
       with:
         name: test-results
         path: ./TestResults
-

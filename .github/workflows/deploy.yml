@@ -24,21 +24,19 @@ jobs:
     - name: Download Windows artifact
       uses: actions/download-artifact@v4
       with:
-        name: published-app-windows
+        name: published-app-windows-latest
         path: ./publish/windows
 
     - name: Download Linux artifact
       uses: actions/download-artifact@v4
       with:
-        name: published-app-linux
+        name: published-app-ubuntu-latest
         path: ./publish/linux
 
-    - name: Bundle artifacts
+    - name: Create zip files for each OS
       run: |
-        mkdir -p ./bundle
-        cp -r ./publish/windows/* ./bundle/
-        cp -r ./publish/linux/* ./bundle/
-        zip -r published-app-bundle.zip ./bundle
+        zip -r published-app-windows.zip ./publish/windows
+        zip -r published-app-linux.zip ./publish/linux
 
     - name: Get current tag
       id: get_tag
@@ -58,15 +56,26 @@ jobs:
         draft: false
         prerelease: false
 
-    - name: Upload Release Asset
+    - name: Upload Windows Release Asset
       if: steps.get_tag.outputs.tag != ''
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./published-app-bundle.zip
-        asset_name: published-app-bundle.zip
+        asset_path: ./published-app-windows.zip
+        asset_name: published-app-windows.zip
+        asset_content_type: application/zip
+
+    - name: Upload Linux Release Asset
+      if: steps.get_tag.outputs.tag != ''
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./published-app-linux.zip
+        asset_name: published-app-linux.zip
         asset_content_type: application/zip
 
     - name: Deploy
@@ -74,8 +83,6 @@ jobs:
         echo "Deploying application..."
         # Add your deployment script/commands here
         # For example, you can use rsync, scp, or any other deployment tool
-        # rsync -avz ./bundle/ user@server:/path/to/deploy
-        # scp -r ./bundle/ user@server:/path/to/deploy
+        # rsync -avz ./publish/ user@server:/path/to/deploy
+        # scp -r ./publish/ user@server:/path/to/deploy
         # Or use a deployment tool like Azure CLI, AWS CLI, etc.
-
-
