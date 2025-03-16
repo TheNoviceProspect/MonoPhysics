@@ -5,19 +5,17 @@ namespace MonoPhysics.Core
 {
     public class Logger : IDisposable
     {
-        private readonly string? _logFile;
-        private readonly bool _useConsole;
+        #region Fields
+
         private static readonly object _lock = new();
+        private readonly string? _logFile;
         private readonly int _maxLogFiles;
+        private readonly bool _useConsole;
         private bool _disposed;
 
-        [DllImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool AllocConsole();
+        #endregion Fields
 
-        [DllImport("kernel32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool FreeConsole();
+        #region Public Constructors
 
         public Logger(string? logFile = null, bool useConsole = true, int maxLogFiles = 5)
         {
@@ -31,6 +29,10 @@ namespace MonoPhysics.Core
             RollLogs();
         }
 
+        #endregion Public Constructors
+
+        #region Enums
+
         public enum LogLevel
         {
             DEBUG,
@@ -39,6 +41,102 @@ namespace MonoPhysics.Core
             ERROR,
             CRITICAL
         }
+
+        #endregion Enums
+
+        #region Public Methods
+
+        public void ConsoleOnlyLog(string message)
+        {
+            lock (_lock)
+            {
+                var originalColor = Console.ForegroundColor;
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine(message);
+                Console.ForegroundColor = originalColor;
+            }
+        }
+
+        public void Critical(string message, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int lineNumber = 0)
+            => Log(LogLevel.CRITICAL, message, memberName, sourceFilePath, lineNumber);
+
+        // Convenience methods
+        public void Debug(string message, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int lineNumber = 0)
+        {
+#if DEBUG
+            Log(LogLevel.DEBUG, message, memberName, sourceFilePath, lineNumber);
+#endif
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+
+            if (_useConsole && !Console.IsOutputRedirected)
+            {
+                FreeConsole();
+            }
+
+            _disposed = true;
+        }
+
+        public void Error(string message, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int lineNumber = 0)
+            => Log(LogLevel.ERROR, message, memberName, sourceFilePath, lineNumber);
+
+        public void Info(string message, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int lineNumber = 0)
+            => Log(LogLevel.INFO, message, memberName, sourceFilePath, lineNumber);
+
+        public void Log(LogLevel level, string message,
+            [CallerMemberName] string memberName = "",
+            [CallerFilePath] string sourceFilePath = "",
+            [CallerLineNumber] int lineNumber = 0)
+        {
+            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+            var logMessage = $"[{timestamp}] [{level}] [{Path.GetFileName(sourceFilePath)}:{lineNumber}] [{memberName}] {message}";
+
+            lock (_lock)
+            {
+                if (_useConsole)
+                {
+                    var originalColor = Console.ForegroundColor;
+                    Console.ForegroundColor = GetColorForLevel(level);
+                    Console.Write($"[{level}] ");
+                    Console.ForegroundColor = originalColor;
+                    Console.WriteLine(message);
+                }
+
+                if (_logFile != null)
+                {
+                    var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _logFile);
+                    File.AppendAllText(logPath, logMessage + Environment.NewLine);
+                }
+            }
+        }
+
+        public void Warning(string message, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int lineNumber = 0)
+            => Log(LogLevel.WARNING, message, memberName, sourceFilePath, lineNumber);
+
+        #endregion Public Methods
+
+        #region Private Methods
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool AllocConsole();
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool FreeConsole();
+
+        private static ConsoleColor GetColorForLevel(LogLevel level) => level switch
+        {
+            LogLevel.DEBUG => ConsoleColor.Gray,
+            LogLevel.INFO => ConsoleColor.Green,
+            LogLevel.WARNING => ConsoleColor.Yellow,
+            LogLevel.ERROR => ConsoleColor.Red,
+            LogLevel.CRITICAL => ConsoleColor.DarkRed,
+            _ => ConsoleColor.White
+        };
 
         private void RollLogs()
         {
@@ -91,85 +189,6 @@ namespace MonoPhysics.Core
             }
         }
 
-        private static ConsoleColor GetColorForLevel(LogLevel level) => level switch
-        {
-            LogLevel.DEBUG => ConsoleColor.Gray,
-            LogLevel.INFO => ConsoleColor.Green,
-            LogLevel.WARNING => ConsoleColor.Yellow,
-            LogLevel.ERROR => ConsoleColor.Red,
-            LogLevel.CRITICAL => ConsoleColor.DarkRed,
-            _ => ConsoleColor.White
-        };
-
-        public void Log(LogLevel level, string message,
-            [CallerMemberName] string memberName = "",
-            [CallerFilePath] string sourceFilePath = "",
-            [CallerLineNumber] int lineNumber = 0)
-        {
-            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-            var logMessage = $"[{timestamp}] [{level}] [{Path.GetFileName(sourceFilePath)}:{lineNumber}] [{memberName}] {message}";
-
-            lock (_lock)
-            {
-                if (_useConsole)
-                {
-                    var originalColor = Console.ForegroundColor;
-                    Console.ForegroundColor = GetColorForLevel(level);
-                    Console.Write($"[{level}] ");
-                    Console.ForegroundColor = originalColor;
-                    Console.WriteLine(message);
-                }
-
-                if (_logFile != null)
-                {
-                    var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, _logFile);
-                    File.AppendAllText(logPath, logMessage + Environment.NewLine);
-                }
-            }
-        }
-
-        public void ConsoleOnlyLog(string message)
-        {
-            lock (_lock)
-            {
-                var originalColor = Console.ForegroundColor;
-                Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine(message);
-                Console.ForegroundColor = originalColor;
-            }
-        }
-
-        // Convenience methods
-        public void Debug(string message, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int lineNumber = 0)
-#if DEBUG
-            => Log(LogLevel.DEBUG, message, memberName, sourceFilePath, lineNumber);
-
-#else
-            => {};
-#endif
-
-        public void Info(string message, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int lineNumber = 0)
-            => Log(LogLevel.INFO, message, memberName, sourceFilePath, lineNumber);
-
-        public void Warning(string message, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int lineNumber = 0)
-            => Log(LogLevel.WARNING, message, memberName, sourceFilePath, lineNumber);
-
-        public void Error(string message, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int lineNumber = 0)
-            => Log(LogLevel.ERROR, message, memberName, sourceFilePath, lineNumber);
-
-        public void Critical(string message, [CallerMemberName] string memberName = "", [CallerFilePath] string sourceFilePath = "", [CallerLineNumber] int lineNumber = 0)
-            => Log(LogLevel.CRITICAL, message, memberName, sourceFilePath, lineNumber);
-
-        public void Dispose()
-        {
-            if (_disposed) return;
-
-            if (_useConsole && !Console.IsOutputRedirected)
-            {
-                FreeConsole();
-            }
-
-            _disposed = true;
-        }
+        #endregion Private Methods
     }
 }
