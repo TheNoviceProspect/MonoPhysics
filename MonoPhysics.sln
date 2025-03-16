@@ -4,6 +4,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.12.35728.132 d17.12
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MonoPhysics", "MonoPhysics\MonoPhysics.csproj", "{4E156074-211B-4BD2-B554-0AFC9F2285B8}"
+	ProjectSection(ProjectDependencies) = postProject
+		{E7BDFF55-46FA-4CAE-95DA-CBC68E22EE2C} = {E7BDFF55-46FA-4CAE-95DA-CBC68E22EE2C}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MonoPhysics.Core", "MonoPhysics.Core\MonoPhysics.Core.csproj", "{E7BDFF55-46FA-4CAE-95DA-CBC68E22EE2C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +20,10 @@ Global
 		{4E156074-211B-4BD2-B554-0AFC9F2285B8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4E156074-211B-4BD2-B554-0AFC9F2285B8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4E156074-211B-4BD2-B554-0AFC9F2285B8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E7BDFF55-46FA-4CAE-95DA-CBC68E22EE2C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E7BDFF55-46FA-4CAE-95DA-CBC68E22EE2C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E7BDFF55-46FA-4CAE-95DA-CBC68E22EE2C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E7BDFF55-46FA-4CAE-95DA-CBC68E22EE2C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

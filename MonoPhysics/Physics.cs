@@ -1,6 +1,7 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using System;
 
 namespace MonoPhysics
 {
@@ -10,6 +11,8 @@ namespace MonoPhysics
         private SpriteBatch _spriteBatch;
 
         private Texture2D _ballTexture;
+        private Vector2 _ballPosition;
+        private float _ballSpeed;
 
         public Physics()
         {
@@ -21,6 +24,9 @@ namespace MonoPhysics
         protected override void Initialize()
         {
             // TODO: Add your initialization logic here
+            _ballPosition = new Vector2(_graphics.PreferredBackBufferWidth / 2,
+                                   _graphics.PreferredBackBufferHeight / 2);
+            _ballSpeed = 100f;
 
             base.Initialize();
         }
@@ -39,7 +45,47 @@ namespace MonoPhysics
                 Exit();
 
             // TODO: Add your update logic here
+            float updatedBallSpeed = _ballSpeed * (float)gameTime.ElapsedGameTime.TotalSeconds;
 
+            var kstate = Keyboard.GetState();
+
+            if (kstate.IsKeyDown(Keys.Up))
+            {
+                _ballPosition.Y -= updatedBallSpeed;
+            }
+
+            if (kstate.IsKeyDown(Keys.Down))
+            {
+                _ballPosition.Y += updatedBallSpeed;
+            }
+
+            if (kstate.IsKeyDown(Keys.Left))
+            {
+                _ballPosition.X -= updatedBallSpeed;
+            }
+
+            if (kstate.IsKeyDown(Keys.Right))
+            {
+                _ballPosition.X += updatedBallSpeed;
+            }
+
+            if (_ballPosition.X > _graphics.PreferredBackBufferWidth - _ballTexture.Width / 2)
+            {
+                _ballPosition.X = _graphics.PreferredBackBufferWidth - _ballTexture.Width / 2;
+            }
+            else if (_ballPosition.X < _ballTexture.Width / 2)
+            {
+                _ballPosition.X = _ballTexture.Width / 2;
+            }
+
+            if (_ballPosition.Y > _graphics.PreferredBackBufferHeight - _ballTexture.Height / 2)
+            {
+                _ballPosition.Y = _graphics.PreferredBackBufferHeight - _ballTexture.Height / 2;
+            }
+            else if (_ballPosition.Y < _ballTexture.Height / 2)
+            {
+                _ballPosition.Y = _ballTexture.Height / 2;
+            }
             base.Update(gameTime);
         }
 
@@ -49,7 +95,17 @@ namespace MonoPhysics
 
             // TODO: Add your drawing code here
             _spriteBatch.Begin();
-            _spriteBatch.Draw(_ballTexture, new Vector2(100, 100), Color.White);
+            _spriteBatch.Draw(
+                _ballTexture,
+                _ballPosition,
+                null,
+                Color.White,
+                0f,
+                new Vector2(_ballTexture.Width / 2, _ballTexture.Height / 2),
+                Vector2.One,
+                SpriteEffects.None,
+                0f
+            );
             _spriteBatch.End();
 
             base.Draw(gameTime);
