@@ -5,6 +5,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
+using System.Collections.Generic;
 
 namespace MonoPhysics
 {
@@ -15,9 +16,9 @@ namespace MonoPhysics
     {
         #region Fields
 
-        private Vector2 _ballPosition;
-        private float _ballSpeed;
         private Texture2D _ballTexture;
+        private Texture2D _boundTexture;
+        private List<CircleBody> _circleBodies;
         private GraphicsDeviceManager _graphics;
         private SpriteBatch _spriteBatch;
 
@@ -47,7 +48,9 @@ namespace MonoPhysics
             //world = new World(new System.Numerics.Vector2(0, -10));
             // NO GRAVITY
             world = new World(new System.Numerics.Vector2(0, 0));
-            CreateBalls(800, 600);
+            _circleBodies = new List<CircleBody>();
+            CreateBounds();
+            CreateBalls();
         }
 
         #endregion Public Constructors
@@ -64,17 +67,22 @@ namespace MonoPhysics
 
             // TODO: Add your drawing code here
             _spriteBatch.Begin();
-            _spriteBatch.Draw(
-                _ballTexture,
-                _ballPosition,
-                null,
-                Microsoft.Xna.Framework.Color.White,
-                0f,
-                new Vector2(_ballTexture.Width / 2, _ballTexture.Height / 2),
-                Vector2.One,
-                SpriteEffects.None,
-                0f
-            );
+            foreach (var circle in _circleBodies)
+            {
+                var position = circle.body.GetPosition();
+                var screenPosition = new Vector2(position.X * 64f, position.Y * 64f); // Convert to pixels
+                _spriteBatch.Draw(
+                    _ballTexture,
+                    screenPosition,
+                    null,
+                    Microsoft.Xna.Framework.Color.White,
+                    0f,
+                    new Vector2(_ballTexture.Width / 2, _ballTexture.Height / 2),
+                    Vector2.One,
+                    SpriteEffects.None,
+                    0f
+                );
+            }
             _spriteBatch.End();
 
             base.Draw(gameTime);
@@ -86,9 +94,6 @@ namespace MonoPhysics
         protected override void Initialize()
         {
             // TODO: Add your initialization logic here
-            _ballPosition = new Vector2(_graphics.PreferredBackBufferWidth / 2,
-                                   _graphics.PreferredBackBufferHeight / 2);
-            _ballSpeed = 100f;
 
             base.Initialize();
         }
@@ -102,6 +107,10 @@ namespace MonoPhysics
 
             // TODO: use this.Content to load your game content here
             _ballTexture = Content.Load<Texture2D>("Assets/Images/ball");
+
+            // Create a 1x1 pixel texture for drawing bounds
+            _boundTexture = new Texture2D(GraphicsDevice, 1, 1);
+            _boundTexture.SetData(new[] { Microsoft.Xna.Framework.Color.White });
         }
 
         /// <summary>
@@ -114,47 +123,8 @@ namespace MonoPhysics
                 Exit();
 
             // TODO: Add your update logic here
-            float updatedBallSpeed = _ballSpeed * (float)gameTime.ElapsedGameTime.TotalSeconds;
 
-            var kstate = Keyboard.GetState();
-
-            if (kstate.IsKeyDown(Keys.Up))
-            {
-                _ballPosition.Y -= updatedBallSpeed;
-            }
-
-            if (kstate.IsKeyDown(Keys.Down))
-            {
-                _ballPosition.Y += updatedBallSpeed;
-            }
-
-            if (kstate.IsKeyDown(Keys.Left))
-            {
-                _ballPosition.X -= updatedBallSpeed;
-            }
-
-            if (kstate.IsKeyDown(Keys.Right))
-            {
-                _ballPosition.X += updatedBallSpeed;
-            }
-
-            if (_ballPosition.X > _graphics.PreferredBackBufferWidth - _ballTexture.Width / 2)
-            {
-                _ballPosition.X = _graphics.PreferredBackBufferWidth - _ballTexture.Width / 2;
-            }
-            else if (_ballPosition.X < _ballTexture.Width / 2)
-            {
-                _ballPosition.X = _ballTexture.Width / 2;
-            }
-
-            if (_ballPosition.Y > _graphics.PreferredBackBufferHeight - _ballTexture.Height / 2)
-            {
-                _ballPosition.Y = _graphics.PreferredBackBufferHeight - _ballTexture.Height / 2;
-            }
-            else if (_ballPosition.Y < _ballTexture.Height / 2)
-            {
-                _ballPosition.Y = _ballTexture.Height / 2;
-            }
+            world.Step((float)gameTime.ElapsedGameTime.TotalSeconds, 8, 3);
             base.Update(gameTime);
         }
 
@@ -162,15 +132,15 @@ namespace MonoPhysics
 
         #region Private Methods
 
-        private void CreateBalls(int clientwidth, int clientheight)
+        private void CreateBalls()
         {
             Random random = new Random();
 
             // Create 5 circles
             for (int i = 0; i < 5; i++)
             {
-                float x = (float)(random.NextDouble() * clientwidth);
-                float y = (float)(random.NextDouble() * clientheight);
+                float x = (float)(random.NextDouble() * Program._config.Width);
+                float y = (float)(random.NextDouble() * Program._config.Height);
 
                 BodyDef bodyDef = new BodyDef();
                 bodyDef.Position.Set(x / 64f, y / 64f); // Convert to meters
@@ -183,10 +153,73 @@ namespace MonoPhysics
                 body.CreateFixture(fixtureDef);
                 body.BodyType = BodyType.DynamicBody;
 
+                // Set random initial velocity
+                float velocityX = (float)(random.NextDouble() * 2 - 1); // Random value between -1 and 1
+                float velocityY = (float)(random.NextDouble() * 2 - 1); // Random value between -1 and 1
+                body.SetLinearVelocity(new System.Numerics.Vector2(velocityX, velocityY));
+
                 // Store the bodies
                 CircleBody circle = new CircleBody(body, BaseRadius);
+                _circleBodies.Add(circle);
                 Program._log.Debug($"[CREATE] New CircleBody[{i + 1}] at X:{circle.body.GetPosition().X} Y:{circle.body.GetPosition().Y} with r{circle.radius}");
             }
+        }
+
+        private void CreateBounds()
+        {
+            float width = Program._config.Width / 64f; // Convert to meters
+            float height = Program._config.Height / 64f; // Convert to meters
+
+            // Create ground
+            BodyDef groundBodyDef = new BodyDef();
+            groundBodyDef.Position.Set(0, height);
+            Body groundBody = world.CreateBody(groundBodyDef);
+            EdgeShape groundBox = new EdgeShape();
+            groundBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(width, 0));
+            groundBody.CreateFixture(groundBox, 0);
+
+            // Create ceiling
+            BodyDef ceilingBodyDef = new BodyDef();
+            ceilingBodyDef.Position.Set(0, 0);
+            Body ceilingBody = world.CreateBody(ceilingBodyDef);
+            EdgeShape ceilingBox = new EdgeShape();
+            ceilingBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(width, 0));
+            ceilingBody.CreateFixture(ceilingBox, 0);
+
+            // Create left wall
+            BodyDef leftWallBodyDef = new BodyDef();
+            leftWallBodyDef.Position.Set(0, 0);
+            Body leftWallBody = world.CreateBody(leftWallBodyDef);
+            EdgeShape leftWallBox = new EdgeShape();
+            leftWallBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(width, 0));
+            leftWallBody.CreateFixture(leftWallBox, 0);
+
+            // Create right wall
+            BodyDef rightWallBodyDef = new BodyDef();
+            rightWallBodyDef.Position.Set(width, 0);
+            Body rightWallBody = world.CreateBody(rightWallBodyDef);
+            EdgeShape rightWallBox = new EdgeShape();
+            rightWallBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(width, 0));
+            rightWallBody.CreateFixture(rightWallBox, 0);
+            Program._log.Debug($"[CREATE] Bounds created: Ground, Ceiling, Left Wall, Right Wall");
+        }
+
+        private void DrawBounds()
+        {
+            float width = Program._config.Width;
+            float height = Program._config.Height;
+
+            // Draw ground
+            _spriteBatch.Draw(_boundTexture, new Rectangle(0, (int)height - 1, (int)width, 1), Microsoft.Xna.Framework.Color.Red);
+
+            // Draw ceiling
+            _spriteBatch.Draw(_boundTexture, new Rectangle(0, 0, (int)width, 1), Microsoft.Xna.Framework.Color.Red);
+
+            // Draw left wall
+            _spriteBatch.Draw(_boundTexture, new Rectangle(0, 0, 1, (int)height), Microsoft.Xna.Framework.Color.Red);
+
+            // Draw right wall
+            _spriteBatch.Draw(_boundTexture, new Rectangle((int)width - 1, 0, 1, (int)height), Microsoft.Xna.Framework.Color.Red);
         }
 
         #endregion Private Methods
