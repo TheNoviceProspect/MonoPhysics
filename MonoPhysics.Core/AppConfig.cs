@@ -1,23 +1,26 @@
 ﻿using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace MonoPhysics.Core.Configuration
 {
-    [JsonSourceGenerationOptions(WriteIndented = true)]
-    [JsonSerializable(typeof(AppConfig))]
-    internal partial class AppConfigContext : JsonSerializerContext
-    { }
-
     public class AppConfig
     {
-        public int Width { get; set; } = 1280;
-        public int Height { get; set; } = 720;
-        public bool Fullscreen { get; set; } = false;
-
-        public int LogFilesToKeep { get; set; } = 5;
+        #region Fields
 
         private static readonly string ConfigPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appconfig.json");
         private static readonly JsonSerializerOptions Options = new() { WriteIndented = true, TypeInfoResolver = AppConfigContext.Default };
+
+        #endregion Fields
+
+        #region Properties
+
+        public bool Fullscreen { get; set; } = false;
+        public int Height { get; set; } = 720;
+        public int LogFilesToKeep { get; set; } = 5;
+        public int Width { get; set; } = 1280;
+
+        #endregion Properties
+
+        #region Public Methods
 
         public static AppConfig Load()
         {
@@ -37,5 +40,7 @@ namespace MonoPhysics.Core.Configuration
             var jsonString = JsonSerializer.Serialize(this, Options);
             File.WriteAllText(ConfigPath, jsonString);
         }
+
+        #endregion Public Methods
     }
 }

@@ -1,7 +1,10 @@
-﻿using Box2DSharp.Dynamics;
+﻿using Box2DSharp.Collision.Shapes;
+using Box2DSharp.Common;
+using Box2DSharp.Dynamics;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using System;
 
 namespace MonoPhysics
 {
@@ -10,48 +13,71 @@ namespace MonoPhysics
     /// </summary>
     public class Physics : Game
     {
+        #region Fields
+
+        private Vector2 _ballPosition;
+        private float _ballSpeed;
+        private Texture2D _ballTexture;
         private GraphicsDeviceManager _graphics;
         private SpriteBatch _spriteBatch;
 
-        private Texture2D _ballTexture;
-        private Vector2 _ballPosition;
-        private float _ballSpeed;
+        private float BaseRadius = 10f;
+        private World world;
 
-        /// <summary>
-        /// A struct to hold a circle body and its radius
-        /// </summary>
-        public struct CircleBody
-        {
-            /// <summary>
-            /// The body of the circle (for physics purposes)
-            /// </summary>
-            public Body body;
+        #endregion Fields
 
-            /// <summary>
-            /// The radius of the circle
-            /// </summary>
-            public float radius;
-
-            /// <summary>
-            /// The main constructor for the CircleBody struct
-            /// </summary>
-            /// <param name="body">Contains the physics object</param>
-            /// <param name="radius">The radius of the circle</param>
-            public CircleBody(Body body, float radius)
-            {
-                this.body = body;
-                this.radius = radius;
-            }
-        }
+        #region Public Constructors
 
         /// <summary>
         /// The main constructor
         /// </summary>
         public Physics()
         {
+            // Initialize the graphics device manager
             _graphics = new GraphicsDeviceManager(this);
+            _graphics.PreferredBackBufferWidth = Program._config.Width;
+            _graphics.PreferredBackBufferHeight = Program._config.Height;
+            Window.Title = "Physics Demo in MonoGame";
+            _graphics.ApplyChanges();
+
+            // Load content
             Content.RootDirectory = "Content";
             IsMouseVisible = true;
+            // GRAVITY
+            //world = new World(new System.Numerics.Vector2(0, -10));
+            // NO GRAVITY
+            world = new World(new System.Numerics.Vector2(0, 0));
+            CreateBalls(800, 600);
+        }
+
+        #endregion Public Constructors
+
+        #region Protected Methods
+
+        /// <summary>
+        /// This is called when the game should draw itself
+        /// </summary>
+        /// <param name="gameTime"></param>
+        protected override void Draw(GameTime gameTime)
+        {
+            GraphicsDevice.Clear(Microsoft.Xna.Framework.Color.CornflowerBlue);
+
+            // TODO: Add your drawing code here
+            _spriteBatch.Begin();
+            _spriteBatch.Draw(
+                _ballTexture,
+                _ballPosition,
+                null,
+                Microsoft.Xna.Framework.Color.White,
+                0f,
+                new Vector2(_ballTexture.Width / 2, _ballTexture.Height / 2),
+                Vector2.One,
+                SpriteEffects.None,
+                0f
+            );
+            _spriteBatch.End();
+
+            base.Draw(gameTime);
         }
 
         /// <summary>
@@ -132,30 +158,76 @@ namespace MonoPhysics
             base.Update(gameTime);
         }
 
-        /// <summary>
-        /// This is called when the game should draw itself
-        /// </summary>
-        /// <param name="gameTime"></param>
-        protected override void Draw(GameTime gameTime)
+        #endregion Protected Methods
+
+        #region Private Methods
+
+        private void CreateBalls(int clientwidth, int clientheight)
         {
-            GraphicsDevice.Clear(Color.CornflowerBlue);
+            Random random = new Random();
 
-            // TODO: Add your drawing code here
-            _spriteBatch.Begin();
-            _spriteBatch.Draw(
-                _ballTexture,
-                _ballPosition,
-                null,
-                Color.White,
-                0f,
-                new Vector2(_ballTexture.Width / 2, _ballTexture.Height / 2),
-                Vector2.One,
-                SpriteEffects.None,
-                0f
-            );
-            _spriteBatch.End();
+            // Create 5 circles
+            for (int i = 0; i < 5; i++)
+            {
+                float x = (float)(random.NextDouble() * clientwidth);
+                float y = (float)(random.NextDouble() * clientheight);
 
-            base.Draw(gameTime);
+                BodyDef bodyDef = new BodyDef();
+                bodyDef.Position.Set(x / 64f, y / 64f); // Convert to meters
+
+                CircleShape circleShape = new CircleShape() { Radius = BaseRadius / 64f };
+                FixtureDef fixtureDef = new FixtureDef();
+                fixtureDef.Shape = circleShape;
+
+                Body body = world.CreateBody(bodyDef);
+                body.CreateFixture(fixtureDef);
+                body.BodyType = BodyType.DynamicBody;
+
+                // Store the bodies
+                CircleBody circle = new CircleBody(body, BaseRadius);
+                Program._log.Debug($"[CREATE] New CircleBody[{i + 1}] at X:{circle.body.GetPosition().X} Y:{circle.body.GetPosition().Y} with r{circle.radius}");
+            }
         }
+
+        #endregion Private Methods
+
+        #region Structs
+
+        /// <summary>
+        /// A struct to hold a circle body and its radius
+        /// </summary>
+        public struct CircleBody
+        {
+            #region Fields
+
+            /// <summary>
+            /// The body of the circle (for physics purposes)
+            /// </summary>
+            public Body body;
+
+            /// <summary>
+            /// The radius of the circle
+            /// </summary>
+            public float radius;
+
+            #endregion Fields
+
+            #region Public Constructors
+
+            /// <summary>
+            /// The main constructor for the CircleBody struct
+            /// </summary>
+            /// <param name="body">Contains the physics object</param>
+            /// <param name="radius">The radius of the circle</param>
+            public CircleBody(Body body, float radius)
+            {
+                this.body = body;
+                this.radius = radius;
+            }
+
+            #endregion Public Constructors
+        }
+
+        #endregion Structs
     }
 }
