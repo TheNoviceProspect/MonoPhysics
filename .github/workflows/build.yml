@@ -14,6 +14,14 @@ jobs:
         os: [windows-latest, ubuntu-latest]
 
     steps:
+    - name: Set runtime variable
+      run: |
+        if [ "${{ matrix.os }}" == "windows-latest" ]; then
+          echo "RUNTIME=win-x64" >> $GITHUB_ENV
+        else
+          echo "RUNTIME=linux-x64" >> $GITHUB_ENV
+        fi
+
     - name: Checkout code
       uses: actions/checkout@v4
       with:
@@ -50,7 +58,12 @@ jobs:
       run: dotnet build MonoPhysics.Core.Tests/MonoPhysics.Core.Tests.csproj --no-restore
 
     - name: Publish MonoPhysics
-      run: dotnet publish MonoPhysics/MonoPhysics.csproj -c Release -o ./publish/MonoPhysics
+      run: dotnet publish MonoPhysics/MonoPhysics.csproj -c Release -o ./publish/MonoPhysics --self-contained --runtime ${{ env.RUNTIME }}
+
+    - name: Verify published artifacts
+      run: |
+        echo "Published files:"
+        ls -R ./publish/MonoPhysics
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
