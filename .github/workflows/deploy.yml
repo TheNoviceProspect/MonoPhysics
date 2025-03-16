@@ -1,0 +1,67 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["Test"]
+    types:
+      - completed
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 9.0.x
+
+    - name: Download artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: published-app
+        path: ./publish
+
+    - name: Get current tag
+      id: get_tag
+      run: |
+        TAG=$(git describe --tags --exact-match 2>/dev/null || echo "")
+        echo "::set-output name=tag::$TAG"
+
+    - name: Create GitHub Release
+      id: create_release
+      if: steps.get_tag.outputs.tag != ''
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.get_tag.outputs.tag }}
+        release_name: Release ${{ steps.get_tag.outputs.tag }}
+        draft: false
+        prerelease: false
+
+    - name: Upload Release Asset
+      if: steps.get_tag.outputs.tag != ''
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./publish
+        asset_name: published-app.zip
+        asset_content_type: application/zip
+
+    - name: Deploy
+      run: |
+        echo "Deploying application..."
+        # Add your deployment script/commands here
+        # For example, you can use rsync, scp, or any other deployment tool
+        # rsync -avz ./publish/ user@server:/path/to/deploy
+        # scp -r ./publish/ user@server:/path/to/deploy
+        # Or use a deployment tool like Azure CLI, AWS CLI, etc.
+

@@ -12,12 +12,22 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MonoPhysics.Core", "MonoPhy
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{F3742150-E37C-43F9-85B3-5909660C63C8}"
 	ProjectSection(SolutionItems) = preProject
-		.github\workflows\dotnet.yml = .github\workflows\dotnet.yml
+		LICENSE.txt = LICENSE.txt
+		README.md = README.md
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MonoPhysics.Core.Tests", "MonoPhysics.Core.Tests\MonoPhysics.Core.Tests.csproj", "{FC10C125-EADE-419C-A469-E2D0DF38B592}"
 	ProjectSection(ProjectDependencies) = postProject
 		{E7BDFF55-46FA-4CAE-95DA-CBC68E22EE2C} = {E7BDFF55-46FA-4CAE-95DA-CBC68E22EE2C}
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".github", ".github", "{B1A4B67D-903D-4618-B064-80B4B73512E0}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "workflows", "workflows", "{2808ECBA-B790-44B6-B4A3-1F19ACD6E6BE}"
+	ProjectSection(SolutionItems) = preProject
+		.github\workflows\build.yml = .github\workflows\build.yml
+		.github\workflows\deploy.yml = .github\workflows\deploy.yml
+		.github\workflows\test.yml = .github\workflows\test.yml
 	EndProjectSection
 EndProject
 Global
@@ -41,5 +51,9 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{B1A4B67D-903D-4618-B064-80B4B73512E0} = {F3742150-E37C-43F9-85B3-5909660C63C8}
+		{2808ECBA-B790-44B6-B4A3-1F19ACD6E6BE} = {B1A4B67D-903D-4618-B064-80B4B73512E0}
 	EndGlobalSection
 EndGlobal
