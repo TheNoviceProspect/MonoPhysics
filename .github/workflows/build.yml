@@ -59,7 +59,7 @@ jobs:
       run: dotnet build MonoPhysics.Core.Tests/MonoPhysics.Core.Tests.csproj --no-restore
 
     - name: Publish MonoPhysics
-      run: dotnet publish MonoPhysics/MonoPhysics.csproj -c Release -o ./publish/MonoPhysics --self-contained --runtime ${{ env.RUNTIME }}
+      run: dotnet publish MonoPhysics/MonoPhysics.csproj --no-build --no-restore -c Release -o ./publish/MonoPhysics --self-contained --runtime ${{ env.RUNTIME }}
 
     - name: Verify published artifacts
       run: |
@@ -70,4 +70,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: published-app-${{ matrix.os }}
-        path: ./publish
+        path: ./publish/
+        compression-level: 9
+        overwrite: true
+        include-hidden-files: true
