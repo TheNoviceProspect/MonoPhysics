@@ -22,13 +22,13 @@ jobs:
         dotnet-version: 9.0.x
 
     - name: Download Windows artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: published-app-windows
         path: ./publish/windows
 
     - name: Download Linux artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: published-app-linux
         path: ./publish/linux
