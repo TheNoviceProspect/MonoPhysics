@@ -5,6 +5,8 @@ using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using MonoPhysics.Core;
+using MonoPhysics.Core.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -36,8 +38,10 @@ namespace MonoPhysics
         // Direct port of the example at https://github.com/ocornut/imgui/blob/master/examples/sdl_opengl2_example/main.cpp
         private float f = 0.0f;
 
+        private bool show_config_window = false;
         private bool show_details_window = false;
         private bool show_test_window = false;
+        private AppConfig tempConfig = null;
         private World world;
 
         #endregion Fields
@@ -113,7 +117,7 @@ namespace MonoPhysics
             DrawBounds();
             DrawBalls();
 
-            if (_showImGui || show_details_window)
+            if (_showImGui || show_details_window || show_config_window)
             {
                 _imGuiRenderer.BeforeLayout(gameTime);
 
@@ -137,10 +141,15 @@ namespace MonoPhysics
                     }
                 }
 
-                // Details window can show independently
+                // Details & Config windows can show independently
                 if (show_details_window)
                 {
                     ShowDetailsWindow();
+                }
+
+                if (show_config_window)
+                {
+                    ShowConfigWindow();
                 }
 
                 _imGuiRenderer.AfterLayout();
@@ -305,6 +314,12 @@ namespace MonoPhysics
                 show_details_window = !show_details_window;
             }
 
+            if (currentKeyboardState.IsKeyDown(Program._config.ImGuiConfigKey) &&
+                _previousKeyboardState.IsKeyUp(Program._config.ImGuiConfigKey))
+            {
+                show_config_window = !show_config_window;
+            }
+
             _previousKeyboardState = currentKeyboardState;
 
             world.Step((float)gameTime.ElapsedGameTime.TotalSeconds, 8, 3);
@@ -455,6 +470,84 @@ namespace MonoPhysics
                 currentNode = currentNode.Next;
             }
             _spriteBatch.End();
+        }
+
+        private void RecreatePhysicsWorld()
+        {
+            // Clear existing bodies
+            _circleBodies.Clear();
+            world.Dispose();
+
+            // Recreate world with same gravity setting
+            world = new World(new System.Numerics.Vector2(0, 0));
+
+            // Rebuild boundaries and balls
+            CreateBounds();
+            CreateBalls();
+        }
+
+        private void ShowConfigWindow()
+        {
+            if (tempConfig == null)
+            {
+                // Create a copy of current config when window opens
+                tempConfig = new AppConfig
+                {
+                    Width = Program._config.Width,
+                    Height = Program._config.Height,
+                    BoundaryPadding = Program._config.BoundaryPadding,
+                    BoundaryThickness = Program._config.BoundaryThickness,
+                    ImGuiToggleKey = Program._config.ImGuiToggleKey,
+                    ImGuiDetailsKey = Program._config.ImGuiDetailsKey,
+                    ImGuiConfigKey = Program._config.ImGuiConfigKey,
+                    Fullscreen = Program._config.Fullscreen,
+                    ScreenResolution = Program._config.ScreenResolution
+                };
+            }
+
+            ImGui.SetNextWindowSize(new Num.Vector2(400, 300), ImGuiCond.FirstUseEver);
+            ImGui.Begin("Configuration", ref show_config_window);
+
+            int selectedResolution = (int)tempConfig.ScreenResolution;
+            string[] resolutions = { "1280x720", "1920x1080" };
+            ImGui.Combo("Resolution", ref selectedResolution, resolutions, resolutions.Length);
+
+            tempConfig.ScreenResolution = (Resolution)selectedResolution;
+            tempConfig.Width = tempConfig.ScreenResolution == Resolution.FullHD_1080p ? 1920 : 1280;
+            tempConfig.Height = tempConfig.ScreenResolution == Resolution.FullHD_1080p ? 1080 : 720;
+
+            bool fullscreen = tempConfig.Fullscreen;
+            ImGui.Checkbox("Fullscreen", ref fullscreen);
+            tempConfig.Fullscreen = fullscreen;
+
+            if (ImGui.Button("Apply Changes"))
+            {
+                // Update the running config through Program's interface
+                Program.UpdateConfig(tempConfig);
+
+                // Save to disk
+                AppConfig.Save(tempConfig);
+
+                // Apply graphics changes
+                _graphics.PreferredBackBufferWidth = tempConfig.Width;
+                _graphics.PreferredBackBufferHeight = tempConfig.Height;
+                _graphics.IsFullScreen = tempConfig.Fullscreen;
+                _graphics.ApplyChanges();
+
+                // Recreate physics world with new boundaries
+                RecreatePhysicsWorld();
+
+                tempConfig = null;
+            }
+
+            ImGui.SameLine();
+            if (ImGui.Button("Cancel"))
+            {
+                tempConfig = null;
+                show_config_window = false;
+            }
+
+            ImGui.End();
         }
 
         private void ShowDetailsWindow()

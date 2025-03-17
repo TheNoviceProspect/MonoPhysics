@@ -18,12 +18,16 @@ namespace MonoPhysics.Core.Configuration
         public int BoundaryThickness { get; set; } = 2; // Default value of 2 pixels
         public bool Fullscreen { get; set; } = false;
         public int Height { get; set; } = 720;
+        public Keys ImGuiConfigKey { get; set; } = Keys.F2;
         public Keys ImGuiDetailsKey { get; set; } = Keys.F9;
         public Keys ImGuiToggleKey { get; set; } = Keys.F10;
         public int LogFilesToKeep { get; set; } = 5;
+        public Resolution ScreenResolution { get; set; }
         public int Width { get; set; } = 1280;
 
         #endregion Properties
+
+        // Add this property
 
         // Default value of 20 pixels
 
@@ -40,6 +44,12 @@ namespace MonoPhysics.Core.Configuration
 
             var jsonString = File.ReadAllText(ConfigPath);
             return JsonSerializer.Deserialize<AppConfig>(jsonString, Options) ?? new AppConfig();
+        }
+
+        public static void Save(AppConfig config)
+        {
+            string jsonString = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText("config.json", jsonString);
         }
 
         public void Save()
