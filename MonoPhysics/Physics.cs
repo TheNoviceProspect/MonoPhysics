@@ -55,8 +55,9 @@ namespace MonoPhysics
         {
             // Initialize the graphics device manager
             _graphics = new GraphicsDeviceManager(this);
-            _graphics.PreferredBackBufferWidth = Program._config.Width;
-            _graphics.PreferredBackBufferHeight = Program._config.Height;
+            var (width, height) = ResolutionHelper.GetResolution(Program._config.ScreenResolution);
+            _graphics.PreferredBackBufferWidth = width;
+            _graphics.PreferredBackBufferHeight = height;
             Window.Title = "Physics Demo in MonoGame";
             _graphics.ApplyChanges();
 
@@ -210,7 +211,7 @@ namespace MonoPhysics
                     {
                         var pos = body.Value.GetPosition();
                         ImGui.Text($"Position: X={pos.X:F2}, Y={pos.Y:F2}");
-                        ImGui.Text($"Height: {Program._config.Height / 64f:F2}m");
+                        ImGui.Text($"Height: {(Program._config.ScreenResolution == ScreenResolution.R1080p ? 1080 : 720 / 64f):F2}m");
                         ImGui.TreePop();
                     }
 
@@ -219,7 +220,7 @@ namespace MonoPhysics
                     {
                         var pos = body.Value.GetPosition();
                         ImGui.Text($"Position: X={pos.X:F2}, Y={pos.Y:F2}");
-                        ImGui.Text($"Height: {Program._config.Height / 64f:F2}m");
+                        ImGui.Text($"Height: {(Program._config.ScreenResolution == ScreenResolution.R1080p ? 1080 : 720 / 64f):F2}m");
                         ImGui.TreePop();
                     }
                 }
@@ -337,7 +338,7 @@ namespace MonoPhysics
             float minX = padding;
             float maxX = Program._config.Width - padding;
             float minY = padding;
-            float maxY = Program._config.Height - padding;
+            float maxY = Program._config.ScreenResolution == ScreenResolution.R1080p ? 1080 - padding : 720 - padding;
 
             // Create 5 circles
             for (int i = 0; i < 5; i++)
@@ -370,7 +371,7 @@ namespace MonoPhysics
         {
             float padding = Program._config.BoundaryPadding / 64f; // Convert to meters
             float width = (Program._config.Width / 64f) - (padding * 2);
-            float height = (Program._config.Height / 64f) - (padding * 2);
+            float height = (Program._config.ScreenResolution == ScreenResolution.R1080p ? 1080 : 720) / 64f - (padding * 2);
 
             // Ground (bottom wall) - horizontal
             BodyDef groundBodyDef = new BodyDef();
@@ -490,31 +491,35 @@ namespace MonoPhysics
         {
             if (tempConfig == null)
             {
-                // Create a copy of current config when window opens
                 tempConfig = new AppConfig
                 {
-                    Width = Program._config.Width,
-                    Height = Program._config.Height,
+                    ScreenResolution = Program._config.ScreenResolution,
                     BoundaryPadding = Program._config.BoundaryPadding,
                     BoundaryThickness = Program._config.BoundaryThickness,
                     ImGuiToggleKey = Program._config.ImGuiToggleKey,
                     ImGuiDetailsKey = Program._config.ImGuiDetailsKey,
                     ImGuiConfigKey = Program._config.ImGuiConfigKey,
                     Fullscreen = Program._config.Fullscreen,
-                    ScreenResolution = Program._config.ScreenResolution
+                    Width = Program._config.Width, // Add this line
+                    Height = Program._config.Height // Add this line
                 };
             }
 
             ImGui.SetNextWindowSize(new Num.Vector2(400, 300), ImGuiCond.FirstUseEver);
             ImGui.Begin("Configuration", ref show_config_window);
 
+            // Add resolution dropdown to config window
+            var currentResolution = (int)tempConfig.ScreenResolution;
+            if (ImGui.Combo("Resolution", ref currentResolution, new[] { "720p", "900p", "1080p" }, 3))
+            {
+                tempConfig.ScreenResolution = (ScreenResolution)currentResolution;
+            }
+
             int selectedResolution = (int)tempConfig.ScreenResolution;
             string[] resolutions = { "1280x720", "1920x1080" };
             ImGui.Combo("Resolution", ref selectedResolution, resolutions, resolutions.Length);
 
-            tempConfig.ScreenResolution = (Resolution)selectedResolution;
-            tempConfig.Width = tempConfig.ScreenResolution == Resolution.FullHD_1080p ? 1920 : 1280;
-            tempConfig.Height = tempConfig.ScreenResolution == Resolution.FullHD_1080p ? 1080 : 720;
+            tempConfig.ScreenResolution = (ScreenResolution)selectedResolution;
 
             bool fullscreen = tempConfig.Fullscreen;
             ImGui.Checkbox("Fullscreen", ref fullscreen);
