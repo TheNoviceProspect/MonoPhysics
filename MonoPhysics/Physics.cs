@@ -310,36 +310,37 @@ namespace MonoPhysics
 
         private void CreateBounds()
         {
-            float width = Program._config.Width / 64f; // Convert to meters
-            float height = Program._config.Height / 64f; // Convert to meters
+            float padding = 20f / 64f; // 20 pixels converted to meters
+            float width = (Program._config.Width / 64f) - (padding * 2); // Adjust width for padding
+            float height = (Program._config.Height / 64f) - (padding * 2); // Adjust height for padding
 
-            // Ground (bottom wall) - horizontal
+            // Ground (bottom wall) - horizontal, moved up by padding
             BodyDef groundBodyDef = new BodyDef();
-            groundBodyDef.Position.Set(0, height);
+            groundBodyDef.Position.Set(padding, height);
             Body groundBody = world.CreateBody(groundBodyDef);
             EdgeShape groundBox = new EdgeShape();
             groundBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(width, 0));
             groundBody.CreateFixture(groundBox, 0);
 
-            // Ceiling (top wall) - horizontal
+            // Ceiling (top wall) - horizontal, moved down by padding
             BodyDef ceilingBodyDef = new BodyDef();
-            ceilingBodyDef.Position.Set(0, 0);
+            ceilingBodyDef.Position.Set(padding, padding);
             Body ceilingBody = world.CreateBody(ceilingBodyDef);
             EdgeShape ceilingBox = new EdgeShape();
             ceilingBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(width, 0));
             ceilingBody.CreateFixture(ceilingBox, 0);
 
-            // Left wall - vertical
+            // Left wall - vertical, moved right by padding
             BodyDef leftWallBodyDef = new BodyDef();
-            leftWallBodyDef.Position.Set(0, 0);
+            leftWallBodyDef.Position.Set(padding, padding);
             Body leftWallBody = world.CreateBody(leftWallBodyDef);
             EdgeShape leftWallBox = new EdgeShape();
             leftWallBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(0, height));
             leftWallBody.CreateFixture(leftWallBox, 0);
 
-            // Right wall - vertical
+            // Right wall - vertical, moved left by padding
             BodyDef rightWallBodyDef = new BodyDef();
-            rightWallBodyDef.Position.Set(width, 0);
+            rightWallBodyDef.Position.Set(width + padding, padding);
             Body rightWallBody = world.CreateBody(rightWallBodyDef);
             EdgeShape rightWallBox = new EdgeShape();
             rightWallBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(0, height));
@@ -348,46 +349,63 @@ namespace MonoPhysics
 
         private void DrawBalls()
         {
-            _spriteBatch.Begin();
-            foreach (var circle in _circleBodies)
+            Body currentBody = world.GetBodyList();
+            // Skip the four boundary bodies
+            for (int i = 0; i < 4; i++)
             {
-                var position = circle.body.GetPosition();
-                var screenPosition = new Vector2(position.X * 64f, position.Y * 64f); // Convert to pixels
-                _spriteBatch.Draw(
-                    _ballTexture,
-                    screenPosition,
-                    null,
-                    Microsoft.Xna.Framework.Color.White,
-                    0f,
-                    new Vector2(_ballTexture.Width / 2, _ballTexture.Height / 2),
-                    Vector2.One,
-                    SpriteEffects.None,
-                    0f
-                );
+                currentBody = currentBody.GetNext();
             }
-            _spriteBatch.End();
+
+            while (currentBody != null)
+            {
+                var fixture = currentBody.GetFixtureList();
+                if (fixture?.Shape is CircleShape circle)
+                {
+                    var position = currentBody.GetPosition();
+                    var screenPosition = new Vector2(position.X * 64f, position.Y * 64f);
+
+                    _spriteBatch.Draw(
+                        _ballTexture,
+                        screenPosition,
+                        null,
+                        Color.White,
+                        currentBody.GetAngle(),
+                        new Vector2(_ballTexture.Width / 2, _ballTexture.Height / 2),
+                        Vector2.One,
+                        SpriteEffects.None,
+                        0f
+                    );
+                }
+                currentBody = currentBody.GetNext();
+            }
         }
 
         private void DrawBounds()
         {
-            float width = Program._config.Width;
-            float height = Program._config.Height;
+            int thickness = 2;
+            Body currentBody = world.GetBodyList();
 
-            _spriteBatch.Begin();
+            while (currentBody != null)
+            {
+                // Get the fixture and its shape
+                var fixture = currentBody.GetFixtureList();
+                if (fixture?.Shape is EdgeShape edge)
+                {
+                    // Convert Box2D coordinates to screen coordinates (multiply by 64f)
+                    var pos = currentBody.GetPosition();
+                    var vertex1 = new Vector2(
+                        (pos.X + edge.Vertex1.X) * 64f,
+                        (pos.Y + edge.Vertex1.Y) * 64f
+                    );
+                    var vertex2 = new Vector2(
+                        (pos.X + edge.Vertex2.X) * 64f,
+                        (pos.Y + edge.Vertex2.Y) * 64f
+                    );
 
-            // Draw ground
-            _spriteBatch.Draw(_boundTexture, new Rectangle(0, (int)height - 1, (int)width, 1), Microsoft.Xna.Framework.Color.Red);
-
-            // Draw ceiling
-            _spriteBatch.Draw(_boundTexture, new Rectangle(0, 0, (int)width, 1), Microsoft.Xna.Framework.Color.Red);
-
-            // Draw left wall
-            _spriteBatch.Draw(_boundTexture, new Rectangle(0, 0, 1, (int)height), Microsoft.Xna.Framework.Color.Red);
-
-            // Draw right wall
-            _spriteBatch.Draw(_boundTexture, new Rectangle((int)width - 1, 0, 1, (int)height), Microsoft.Xna.Framework.Color.Red);
-
-            _spriteBatch.End();
+                    _spriteBatch.DrawLine(vertex1, vertex2, Color.Red, thickness);
+                }
+                currentBody = currentBody.GetNext();
+            }
         }
 
         #endregion Private Methods
