@@ -29,4 +29,9 @@ internal class Program
         game.Run();
         _log.Info("Physics Demo v0.1 ended");
     }
+
+    public static void UpdateConfig(AppConfig newConfig)
+    {
+        _config = newConfig;
+    }
 }

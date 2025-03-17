@@ -5,8 +5,11 @@ using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using MonoPhysics.Core;
+using MonoPhysics.Core.Configuration;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Num = System.Numerics;
 
 namespace MonoPhysics
@@ -24,6 +27,8 @@ namespace MonoPhysics
         private GraphicsDeviceManager _graphics;
         private ImGuiRenderer _imGuiRenderer;
         private IntPtr _imGuiTexture;
+        private KeyboardState _previousKeyboardState;
+        private bool _showImGui = false;
         private SpriteBatch _spriteBatch;
         private byte[] _textBuffer = new byte[100];
         private Texture2D _xnaTexture;
@@ -33,8 +38,10 @@ namespace MonoPhysics
         // Direct port of the example at https://github.com/ocornut/imgui/blob/master/examples/sdl_opengl2_example/main.cpp
         private float f = 0.0f;
 
-        private bool show_another_window = false;
+        private bool show_config_window = false;
+        private bool show_details_window = false;
         private bool show_test_window = false;
+        private AppConfig tempConfig = null;
         private World world;
 
         #endregion Fields
@@ -48,8 +55,9 @@ namespace MonoPhysics
         {
             // Initialize the graphics device manager
             _graphics = new GraphicsDeviceManager(this);
-            _graphics.PreferredBackBufferWidth = Program._config.Width;
-            _graphics.PreferredBackBufferHeight = Program._config.Height;
+            var (width, height) = ResolutionHelper.GetResolution(Program._config.ScreenResolution);
+            _graphics.PreferredBackBufferWidth = width;
+            _graphics.PreferredBackBufferHeight = height;
             Window.Title = "Physics Demo in MonoGame";
             _graphics.ApplyChanges();
 
@@ -107,35 +115,46 @@ namespace MonoPhysics
         protected override void Draw(GameTime gameTime)
         {
             GraphicsDevice.Clear(Microsoft.Xna.Framework.Color.CornflowerBlue);
+            DrawBounds();
+            DrawBalls();
 
-            // TODO: Add your drawing code here
-            _spriteBatch.Begin();
-            foreach (var circle in _circleBodies)
+            if (_showImGui || show_details_window || show_config_window)
             {
-                var position = circle.body.GetPosition();
-                var screenPosition = new Vector2(position.X * 64f, position.Y * 64f); // Convert to pixels
-                _spriteBatch.Draw(
-                    _ballTexture,
-                    screenPosition,
-                    null,
-                    Microsoft.Xna.Framework.Color.White,
-                    0f,
-                    new Vector2(_ballTexture.Width / 2, _ballTexture.Height / 2),
-                    Vector2.One,
-                    SpriteEffects.None,
-                    0f
-                );
+                _imGuiRenderer.BeforeLayout(gameTime);
+
+                if (_showImGui)
+                {
+                    // Main ImGui window with all controls
+                    ImGui.Text("Hello, world!");
+                    ImGui.SliderFloat("float", ref f, 0.0f, 1.0f, string.Empty);
+                    ImGui.ColorEdit3("clear color", ref clear_color);
+                    if (ImGui.Button("Test Window")) show_test_window = !show_test_window;
+                    if (ImGui.Button("Another Window")) show_details_window = !show_details_window;
+                    ImGui.Text(string.Format("Application average {0:F3} ms/frame ({1:F1} FPS)", 1000f / ImGui.GetIO().Framerate, ImGui.GetIO().Framerate));
+                    ImGui.InputText("Text input", _textBuffer, 100);
+                    ImGui.Text("Texture sample");
+                    ImGui.Image(_imGuiTexture, new Num.Vector2(300, 150), Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.One, Num.Vector4.One);
+
+                    if (show_test_window)
+                    {
+                        ImGui.SetNextWindowPos(new Num.Vector2(650, 20), ImGuiCond.FirstUseEver);
+                        ImGui.ShowDemoWindow(ref show_test_window);
+                    }
+                }
+
+                // Details & Config windows can show independently
+                if (show_details_window)
+                {
+                    ShowDetailsWindow();
+                }
+
+                if (show_config_window)
+                {
+                    ShowConfigWindow();
+                }
+
+                _imGuiRenderer.AfterLayout();
             }
-            _spriteBatch.End();
-
-            // Call BeforeLayout first to set things up
-            _imGuiRenderer.BeforeLayout(gameTime);
-
-            // Draw our UI
-            ImGuiLayout();
-
-            // Call AfterLayout now to finish up and draw all the things
-            _imGuiRenderer.AfterLayout();
 
             base.Draw(gameTime);
         }
@@ -152,7 +171,7 @@ namespace MonoPhysics
                 ImGui.SliderFloat("float", ref f, 0.0f, 1.0f, string.Empty);
                 ImGui.ColorEdit3("clear color", ref clear_color);
                 if (ImGui.Button("Test Window")) show_test_window = !show_test_window;
-                if (ImGui.Button("Another Window")) show_another_window = !show_another_window;
+                if (ImGui.Button("Another Window")) show_details_window = !show_details_window;
                 ImGui.Text(string.Format("Application average {0:F3} ms/frame ({1:F1} FPS)", 1000f / ImGui.GetIO().Framerate, ImGui.GetIO().Framerate));
 
                 ImGui.InputText("Text input", _textBuffer, 100);
@@ -162,11 +181,69 @@ namespace MonoPhysics
             }
 
             // 2. Show another simple window, this time using an explicit Begin/End pair
-            if (show_another_window)
+            if (show_details_window)
             {
-                ImGui.SetNextWindowSize(new Num.Vector2(200, 100), ImGuiCond.FirstUseEver);
-                ImGui.Begin("Another Window", ref show_another_window);
-                ImGui.Text("Hello");
+                ImGui.SetNextWindowSize(new Num.Vector2(300, 400), ImGuiCond.FirstUseEver);
+                ImGui.Begin("Physics Bodies Info", ref show_details_window);
+
+                if (ImGui.CollapsingHeader("Boundary Boxes"))
+                {
+                    var body = world.BodyList.First;
+                    if (ImGui.TreeNode("Ground"))
+                    {
+                        var pos = body.Value.GetPosition();
+                        ImGui.Text($"Position: X={pos.X:F2}, Y={pos.Y:F2}");
+                        ImGui.Text($"Width: {Program._config.Width / 64f:F2}m");
+                        ImGui.TreePop();
+                    }
+
+                    body = body.Next;
+                    if (ImGui.TreeNode("Ceiling"))
+                    {
+                        var pos = body.Value.GetPosition();
+                        ImGui.Text($"Position: X={pos.X:F2}, Y={pos.Y:F2}");
+                        ImGui.Text($"Width: {Program._config.Width / 64f:F2}m");
+                        ImGui.TreePop();
+                    }
+
+                    body = body.Next;
+                    if (ImGui.TreeNode("Left Wall"))
+                    {
+                        var pos = body.Value.GetPosition();
+                        ImGui.Text($"Position: X={pos.X:F2}, Y={pos.Y:F2}");
+                        ImGui.Text($"Height: {(Program._config.ScreenResolution == ScreenResolution.R1080p ? 1080 : 720 / 64f):F2}m");
+                        ImGui.TreePop();
+                    }
+
+                    body = body.Next;
+                    if (ImGui.TreeNode("Right Wall"))
+                    {
+                        var pos = body.Value.GetPosition();
+                        ImGui.Text($"Position: X={pos.X:F2}, Y={pos.Y:F2}");
+                        ImGui.Text($"Height: {(Program._config.ScreenResolution == ScreenResolution.R1080p ? 1080 : 720 / 64f):F2}m");
+                        ImGui.TreePop();
+                    }
+                }
+
+                if (ImGui.CollapsingHeader("Dynamic Bodies"))
+                {
+                    for (int i = 0; i < _circleBodies.Count; i++)
+                    {
+                        var circle = _circleBodies[i];
+                        var position = circle.body.GetPosition();
+                        var velocity = circle.body.LinearVelocity;
+
+                        if (ImGui.TreeNode($"Ball {i + 1}"))
+                        {
+                            ImGui.Text($"Position: X={position.X:F2}, Y={position.Y:F2}");
+                            ImGui.Text($"Velocity: X={velocity.X:F2}, Y={velocity.Y:F2}");
+                            ImGui.Text($"Radius: {circle.radius:F2}");
+                            ImGui.Text($"Body Type: {circle.body.BodyType}");
+                            ImGui.TreePop();
+                        }
+                    }
+                }
+
                 ImGui.End();
             }
 
@@ -224,7 +301,27 @@ namespace MonoPhysics
             if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
                 Exit();
 
-            // TODO: Add your update logic here
+            KeyboardState currentKeyboardState = Keyboard.GetState();
+
+            if (currentKeyboardState.IsKeyDown(Program._config.ImGuiToggleKey) &&
+                _previousKeyboardState.IsKeyUp(Program._config.ImGuiToggleKey))
+            {
+                _showImGui = !_showImGui;
+            }
+
+            if (currentKeyboardState.IsKeyDown(Program._config.ImGuiDetailsKey) &&
+                _previousKeyboardState.IsKeyUp(Program._config.ImGuiDetailsKey))
+            {
+                show_details_window = !show_details_window;
+            }
+
+            if (currentKeyboardState.IsKeyDown(Program._config.ImGuiConfigKey) &&
+                _previousKeyboardState.IsKeyUp(Program._config.ImGuiConfigKey))
+            {
+                show_config_window = !show_config_window;
+            }
+
+            _previousKeyboardState = currentKeyboardState;
 
             world.Step((float)gameTime.ElapsedGameTime.TotalSeconds, 8, 3);
             base.Update(gameTime);
@@ -237,12 +334,17 @@ namespace MonoPhysics
         private void CreateBalls()
         {
             Random random = new Random();
+            float padding = Program._config.BoundaryPadding;
+            float minX = padding;
+            float maxX = Program._config.Width - padding;
+            float minY = padding;
+            float maxY = Program._config.ScreenResolution == ScreenResolution.R1080p ? 1080 - padding : 720 - padding;
 
             // Create 5 circles
             for (int i = 0; i < 5; i++)
             {
-                float x = (float)(random.NextDouble() * Program._config.Width);
-                float y = (float)(random.NextDouble() * Program._config.Height);
+                float x = minX + (float)(random.NextDouble() * (maxX - minX));
+                float y = minY + (float)(random.NextDouble() * (maxY - minY));
 
                 BodyDef bodyDef = new BodyDef();
                 bodyDef.Position.Set(x / 64f, y / 64f); // Convert to meters
@@ -255,12 +357,10 @@ namespace MonoPhysics
                 body.CreateFixture(fixtureDef);
                 body.BodyType = BodyType.DynamicBody;
 
-                // Set random initial velocity
-                float velocityX = (float)(random.NextDouble() * 2 - 1); // Random value between -1 and 1
-                float velocityY = (float)(random.NextDouble() * 2 - 1); // Random value between -1 and 1
+                float velocityX = (float)(random.NextDouble() * 2 - 1);
+                float velocityY = (float)(random.NextDouble() * 2 - 1);
                 body.SetLinearVelocity(new System.Numerics.Vector2(velocityX, velocityY));
 
-                // Store the bodies
                 CircleBody circle = new CircleBody(body, BaseRadius);
                 _circleBodies.Add(circle);
                 Program._log.Debug($"[CREATE] New CircleBody[{i + 1}] at X:{circle.body.GetPosition().X} Y:{circle.body.GetPosition().Y} with r{circle.radius}");
@@ -269,59 +369,256 @@ namespace MonoPhysics
 
         private void CreateBounds()
         {
-            float width = Program._config.Width / 64f; // Convert to meters
-            float height = Program._config.Height / 64f; // Convert to meters
+            float padding = Program._config.BoundaryPadding / 64f; // Convert to meters
+            float width = (Program._config.Width / 64f) - (padding * 2);
+            float height = (Program._config.ScreenResolution == ScreenResolution.R1080p ? 1080 : 720) / 64f - (padding * 2);
 
-            // Create ground
+            // Ground (bottom wall) - horizontal
             BodyDef groundBodyDef = new BodyDef();
-            groundBodyDef.Position.Set(0, height);
+            groundBodyDef.Position.Set(padding, height);
             Body groundBody = world.CreateBody(groundBodyDef);
             EdgeShape groundBox = new EdgeShape();
             groundBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(width, 0));
             groundBody.CreateFixture(groundBox, 0);
 
-            // Create ceiling
+            // Ceiling (top wall) - horizontal
             BodyDef ceilingBodyDef = new BodyDef();
-            ceilingBodyDef.Position.Set(0, 0);
+            ceilingBodyDef.Position.Set(padding, padding);
             Body ceilingBody = world.CreateBody(ceilingBodyDef);
             EdgeShape ceilingBox = new EdgeShape();
             ceilingBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(width, 0));
             ceilingBody.CreateFixture(ceilingBox, 0);
 
-            // Create left wall
+            // Left wall - vertical (now exactly between top and bottom)
             BodyDef leftWallBodyDef = new BodyDef();
-            leftWallBodyDef.Position.Set(0, 0);
+            leftWallBodyDef.Position.Set(padding, padding);
             Body leftWallBody = world.CreateBody(leftWallBodyDef);
             EdgeShape leftWallBox = new EdgeShape();
-            leftWallBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(width, 0));
+            leftWallBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(0, height - padding));
             leftWallBody.CreateFixture(leftWallBox, 0);
 
-            // Create right wall
+            // Right wall - vertical (now exactly between top and bottom)
             BodyDef rightWallBodyDef = new BodyDef();
-            rightWallBodyDef.Position.Set(width, 0);
+            rightWallBodyDef.Position.Set(width + padding, padding);
             Body rightWallBody = world.CreateBody(rightWallBodyDef);
             EdgeShape rightWallBox = new EdgeShape();
-            rightWallBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(width, 0));
+            rightWallBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(0, height - padding));
             rightWallBody.CreateFixture(rightWallBox, 0);
-            Program._log.Debug($"[CREATE] Bounds created: Ground, Ceiling, Left Wall, Right Wall");
+        }
+
+        private void DrawBalls()
+        {
+            var currentNode = world.BodyList.First;
+
+            // Skip the four boundary bodies
+            for (int i = 0; i < 4; i++)
+            {
+                currentNode = currentNode.Next;
+            }
+            _spriteBatch.Begin();
+            while (currentNode != null)
+            {
+                var currentBody = currentNode.Value;
+                var fixture = currentBody.FixtureList.FirstOrDefault();
+                if (fixture?.Shape is CircleShape circle)
+                {
+                    var position = currentBody.GetPosition();
+                    var screenPosition = new Vector2(position.X * 64f, position.Y * 64f);
+
+                    _spriteBatch.Draw(
+                        _ballTexture,
+                        screenPosition,
+                        null,
+                        Microsoft.Xna.Framework.Color.White,
+                        currentBody.GetAngle(),
+                        new Vector2(_ballTexture.Width / 2, _ballTexture.Height / 2),
+                        Vector2.One,
+                        SpriteEffects.None,
+                        0f
+                    );
+                }
+                currentNode = currentNode.Next;
+            }
+            _spriteBatch.End();
         }
 
         private void DrawBounds()
         {
-            float width = Program._config.Width;
-            float height = Program._config.Height;
+            int thickness = Program._config.BoundaryThickness;
+            var currentNode = world.BodyList.First;
 
-            // Draw ground
-            _spriteBatch.Draw(_boundTexture, new Rectangle(0, (int)height - 1, (int)width, 1), Microsoft.Xna.Framework.Color.Red);
+            _spriteBatch.Begin();
+            while (currentNode != null)
+            {
+                var currentBody = currentNode.Value;
+                // Get the fixture and its shape
+                var fixture = currentBody.FixtureList.FirstOrDefault();
+                if (fixture?.Shape is EdgeShape edge)
+                {
+                    // Convert Box2D coordinates to screen coordinates (multiply by 64f)
+                    var pos = currentBody.GetPosition();
+                    var vertex1 = new Vector2(
+                        (pos.X + edge.Vertex1.X) * 64f,
+                        (pos.Y + edge.Vertex1.Y) * 64f
+                    );
+                    var vertex2 = new Vector2(
+                        (pos.X + edge.Vertex2.X) * 64f,
+                        (pos.Y + edge.Vertex2.Y) * 64f
+                    );
 
-            // Draw ceiling
-            _spriteBatch.Draw(_boundTexture, new Rectangle(0, 0, (int)width, 1), Microsoft.Xna.Framework.Color.Red);
+                    _spriteBatch.DrawLine(vertex1, vertex2, Microsoft.Xna.Framework.Color.Red, thickness);
+                }
+                currentNode = currentNode.Next;
+            }
+            _spriteBatch.End();
+        }
 
-            // Draw left wall
-            _spriteBatch.Draw(_boundTexture, new Rectangle(0, 0, 1, (int)height), Microsoft.Xna.Framework.Color.Red);
+        private void RecreatePhysicsWorld()
+        {
+            // Clear existing bodies
+            _circleBodies.Clear();
+            world.Dispose();
 
-            // Draw right wall
-            _spriteBatch.Draw(_boundTexture, new Rectangle((int)width - 1, 0, 1, (int)height), Microsoft.Xna.Framework.Color.Red);
+            // Recreate world with same gravity setting
+            world = new World(new System.Numerics.Vector2(0, 0));
+
+            // Rebuild boundaries and balls
+            CreateBounds();
+            CreateBalls();
+        }
+
+        private void ShowConfigWindow()
+        {
+            if (tempConfig == null)
+            {
+                tempConfig = new AppConfig
+                {
+                    ScreenResolution = Program._config.ScreenResolution,
+                    BoundaryPadding = Program._config.BoundaryPadding,
+                    BoundaryThickness = Program._config.BoundaryThickness,
+                    ImGuiToggleKey = Program._config.ImGuiToggleKey,
+                    ImGuiDetailsKey = Program._config.ImGuiDetailsKey,
+                    ImGuiConfigKey = Program._config.ImGuiConfigKey,
+                    Fullscreen = Program._config.Fullscreen,
+                    Width = Program._config.Width, // Add this line
+                    Height = Program._config.Height // Add this line
+                };
+            }
+
+            ImGui.SetNextWindowSize(new Num.Vector2(400, 300), ImGuiCond.FirstUseEver);
+            ImGui.Begin("Configuration", ref show_config_window);
+
+            // Add resolution dropdown to config window
+            var currentResolution = (int)tempConfig.ScreenResolution;
+            if (ImGui.Combo("Resolution", ref currentResolution, new[] { "720p", "900p", "1080p" }, 3))
+            {
+                tempConfig.ScreenResolution = (ScreenResolution)currentResolution;
+            }
+
+            int selectedResolution = (int)tempConfig.ScreenResolution;
+            string[] resolutions = { "1280x720", "1920x1080" };
+            ImGui.Combo("Resolution", ref selectedResolution, resolutions, resolutions.Length);
+
+            tempConfig.ScreenResolution = (ScreenResolution)selectedResolution;
+
+            bool fullscreen = tempConfig.Fullscreen;
+            ImGui.Checkbox("Fullscreen", ref fullscreen);
+            tempConfig.Fullscreen = fullscreen;
+
+            if (ImGui.Button("Apply Changes"))
+            {
+                // Update the running config through Program's interface
+                Program.UpdateConfig(tempConfig);
+
+                // Save to disk
+                AppConfig.Save(tempConfig);
+
+                // Apply graphics changes
+                _graphics.PreferredBackBufferWidth = tempConfig.Width;
+                _graphics.PreferredBackBufferHeight = tempConfig.Height;
+                _graphics.IsFullScreen = tempConfig.Fullscreen;
+                _graphics.ApplyChanges();
+
+                // Recreate physics world with new boundaries
+                RecreatePhysicsWorld();
+
+                tempConfig = null;
+            }
+
+            ImGui.SameLine();
+            if (ImGui.Button("Cancel"))
+            {
+                tempConfig = null;
+                show_config_window = false;
+            }
+
+            ImGui.End();
+        }
+
+        private void ShowDetailsWindow()
+        {
+            ImGui.SetNextWindowSize(new Num.Vector2(300, 400), ImGuiCond.FirstUseEver);
+            ImGui.Begin("Physics Bodies Info", ref show_details_window);
+
+            if (ImGui.CollapsingHeader("Boundary Boxes"))
+            {
+                var body = world.BodyList.First;
+                if (ImGui.TreeNode("Ground"))
+                {
+                    var pos = body.Value.GetPosition();
+                    ImGui.Text($"Position: X={pos.X:F2}, Y={pos.Y:F2}");
+                    ImGui.Text($"Width: {Program._config.Width / 64f:F2}m");
+                    ImGui.TreePop();
+                }
+
+                body = body.Next;
+                if (ImGui.TreeNode("Ceiling"))
+                {
+                    var pos = body.Value.GetPosition();
+                    ImGui.Text($"Position: X={pos.X:F2}, Y={pos.Y:F2}");
+                    ImGui.Text($"Width: {Program._config.Width / 64f:F2}m");
+                    ImGui.TreePop();
+                }
+
+                body = body.Next;
+                if (ImGui.TreeNode("Left Wall"))
+                {
+                    var pos = body.Value.GetPosition();
+                    ImGui.Text($"Position: X={pos.X:F2}, Y={pos.Y:F2}");
+                    ImGui.Text($"Height: {Program._config.Height / 64f:F2}m");
+                    ImGui.TreePop();
+                }
+
+                body = body.Next;
+                if (ImGui.TreeNode("Right Wall"))
+                {
+                    var pos = body.Value.GetPosition();
+                    ImGui.Text($"Position: X={pos.X:F2}, Y={pos.Y:F2}");
+                    ImGui.Text($"Height: {Program._config.Height / 64f:F2}m");
+                    ImGui.TreePop();
+                }
+            }
+
+            if (ImGui.CollapsingHeader("Dynamic Bodies"))
+            {
+                for (int i = 0; i < _circleBodies.Count; i++)
+                {
+                    var circle = _circleBodies[i];
+                    var position = circle.body.GetPosition();
+                    var velocity = circle.body.LinearVelocity;
+
+                    if (ImGui.TreeNode($"Ball {i + 1}"))
+                    {
+                        ImGui.Text($"Position: X={position.X:F2}, Y={position.Y:F2}");
+                        ImGui.Text($"Velocity: X={velocity.X:F2}, Y={velocity.Y:F2}");
+                        ImGui.Text($"Radius: {circle.radius:F2}");
+                        ImGui.Text($"Body Type: {circle.body.BodyType}");
+                        ImGui.TreePop();
+                    }
+                }
+            }
+
+            ImGui.End();
         }
 
         #endregion Private Methods
