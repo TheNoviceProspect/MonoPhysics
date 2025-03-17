@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using Microsoft.Xna.Framework.Input;
 
 namespace MonoPhysics.Core.Configuration
 {
@@ -13,9 +14,12 @@ namespace MonoPhysics.Core.Configuration
 
         #region Properties
 
-        public float BoundaryPadding { get; set; } = 20f;
+        public float BoundaryPadding { get; set; } = 20f; // Default value of 20 pixels
+        public int BoundaryThickness { get; set; } = 2; // Default value of 2 pixels
         public bool Fullscreen { get; set; } = false;
         public int Height { get; set; } = 720;
+        public Keys ImGuiDetailsKey { get; set; } = Keys.F9;
+        public Keys ImGuiToggleKey { get; set; } = Keys.F10;
         public int LogFilesToKeep { get; set; } = 5;
         public int Width { get; set; } = 1280;
 

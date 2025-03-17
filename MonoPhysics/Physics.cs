@@ -25,6 +25,8 @@ namespace MonoPhysics
         private GraphicsDeviceManager _graphics;
         private ImGuiRenderer _imGuiRenderer;
         private IntPtr _imGuiTexture;
+        private KeyboardState _previousKeyboardState;
+        private bool _showImGui = false;
         private SpriteBatch _spriteBatch;
         private byte[] _textBuffer = new byte[100];
         private Texture2D _xnaTexture;
@@ -110,16 +112,39 @@ namespace MonoPhysics
             GraphicsDevice.Clear(Microsoft.Xna.Framework.Color.CornflowerBlue);
             DrawBounds();
             DrawBalls();
-            // TODO: Add your drawing code here
 
-            // Call BeforeLayout first to set things up
-            _imGuiRenderer.BeforeLayout(gameTime);
+            if (_showImGui || show_details_window)
+            {
+                _imGuiRenderer.BeforeLayout(gameTime);
 
-            // Draw our UI
-            ImGuiLayout();
+                if (_showImGui)
+                {
+                    // Main ImGui window with all controls
+                    ImGui.Text("Hello, world!");
+                    ImGui.SliderFloat("float", ref f, 0.0f, 1.0f, string.Empty);
+                    ImGui.ColorEdit3("clear color", ref clear_color);
+                    if (ImGui.Button("Test Window")) show_test_window = !show_test_window;
+                    if (ImGui.Button("Another Window")) show_details_window = !show_details_window;
+                    ImGui.Text(string.Format("Application average {0:F3} ms/frame ({1:F1} FPS)", 1000f / ImGui.GetIO().Framerate, ImGui.GetIO().Framerate));
+                    ImGui.InputText("Text input", _textBuffer, 100);
+                    ImGui.Text("Texture sample");
+                    ImGui.Image(_imGuiTexture, new Num.Vector2(300, 150), Num.Vector2.Zero, Num.Vector2.One, Num.Vector4.One, Num.Vector4.One);
 
-            // Call AfterLayout now to finish up and draw all the things
-            _imGuiRenderer.AfterLayout();
+                    if (show_test_window)
+                    {
+                        ImGui.SetNextWindowPos(new Num.Vector2(650, 20), ImGuiCond.FirstUseEver);
+                        ImGui.ShowDemoWindow(ref show_test_window);
+                    }
+                }
+
+                // Details window can show independently
+                if (show_details_window)
+                {
+                    ShowDetailsWindow();
+                }
+
+                _imGuiRenderer.AfterLayout();
+            }
 
             base.Draw(gameTime);
         }
@@ -266,7 +291,21 @@ namespace MonoPhysics
             if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
                 Exit();
 
-            // TODO: Add your update logic here
+            KeyboardState currentKeyboardState = Keyboard.GetState();
+
+            if (currentKeyboardState.IsKeyDown(Program._config.ImGuiToggleKey) &&
+                _previousKeyboardState.IsKeyUp(Program._config.ImGuiToggleKey))
+            {
+                _showImGui = !_showImGui;
+            }
+
+            if (currentKeyboardState.IsKeyDown(Program._config.ImGuiDetailsKey) &&
+                _previousKeyboardState.IsKeyUp(Program._config.ImGuiDetailsKey))
+            {
+                show_details_window = !show_details_window;
+            }
+
+            _previousKeyboardState = currentKeyboardState;
 
             world.Step((float)gameTime.ElapsedGameTime.TotalSeconds, 8, 3);
             base.Update(gameTime);
@@ -389,7 +428,7 @@ namespace MonoPhysics
 
         private void DrawBounds()
         {
-            int thickness = 2;
+            int thickness = Program._config.BoundaryThickness;
             var currentNode = world.BodyList.First;
 
             _spriteBatch.Begin();
@@ -416,6 +455,72 @@ namespace MonoPhysics
                 currentNode = currentNode.Next;
             }
             _spriteBatch.End();
+        }
+
+        private void ShowDetailsWindow()
+        {
+            ImGui.SetNextWindowSize(new Num.Vector2(300, 400), ImGuiCond.FirstUseEver);
+            ImGui.Begin("Physics Bodies Info", ref show_details_window);
+
+            if (ImGui.CollapsingHeader("Boundary Boxes"))
+            {
+                var body = world.BodyList.First;
+                if (ImGui.TreeNode("Ground"))
+                {
+                    var pos = body.Value.GetPosition();
+                    ImGui.Text($"Position: X={pos.X:F2}, Y={pos.Y:F2}");
+                    ImGui.Text($"Width: {Program._config.Width / 64f:F2}m");
+                    ImGui.TreePop();
+                }
+
+                body = body.Next;
+                if (ImGui.TreeNode("Ceiling"))
+                {
+                    var pos = body.Value.GetPosition();
+                    ImGui.Text($"Position: X={pos.X:F2}, Y={pos.Y:F2}");
+                    ImGui.Text($"Width: {Program._config.Width / 64f:F2}m");
+                    ImGui.TreePop();
+                }
+
+                body = body.Next;
+                if (ImGui.TreeNode("Left Wall"))
+                {
+                    var pos = body.Value.GetPosition();
+                    ImGui.Text($"Position: X={pos.X:F2}, Y={pos.Y:F2}");
+                    ImGui.Text($"Height: {Program._config.Height / 64f:F2}m");
+                    ImGui.TreePop();
+                }
+
+                body = body.Next;
+                if (ImGui.TreeNode("Right Wall"))
+                {
+                    var pos = body.Value.GetPosition();
+                    ImGui.Text($"Position: X={pos.X:F2}, Y={pos.Y:F2}");
+                    ImGui.Text($"Height: {Program._config.Height / 64f:F2}m");
+                    ImGui.TreePop();
+                }
+            }
+
+            if (ImGui.CollapsingHeader("Dynamic Bodies"))
+            {
+                for (int i = 0; i < _circleBodies.Count; i++)
+                {
+                    var circle = _circleBodies[i];
+                    var position = circle.body.GetPosition();
+                    var velocity = circle.body.LinearVelocity;
+
+                    if (ImGui.TreeNode($"Ball {i + 1}"))
+                    {
+                        ImGui.Text($"Position: X={position.X:F2}, Y={position.Y:F2}");
+                        ImGui.Text($"Velocity: X={velocity.X:F2}, Y={velocity.Y:F2}");
+                        ImGui.Text($"Radius: {circle.radius:F2}");
+                        ImGui.Text($"Body Type: {circle.body.BodyType}");
+                        ImGui.TreePop();
+                    }
+                }
+            }
+
+            ImGui.End();
         }
 
         #endregion Private Methods
