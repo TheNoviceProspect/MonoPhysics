@@ -33,7 +33,7 @@ namespace MonoPhysics
         // Direct port of the example at https://github.com/ocornut/imgui/blob/master/examples/sdl_opengl2_example/main.cpp
         private float f = 0.0f;
 
-        private bool show_another_window = false;
+        private bool show_details_window = false;
         private bool show_test_window = false;
         private World world;
 
@@ -107,26 +107,9 @@ namespace MonoPhysics
         protected override void Draw(GameTime gameTime)
         {
             GraphicsDevice.Clear(Microsoft.Xna.Framework.Color.CornflowerBlue);
-
+            DrawBounds();
+            DrawBalls();
             // TODO: Add your drawing code here
-            _spriteBatch.Begin();
-            foreach (var circle in _circleBodies)
-            {
-                var position = circle.body.GetPosition();
-                var screenPosition = new Vector2(position.X * 64f, position.Y * 64f); // Convert to pixels
-                _spriteBatch.Draw(
-                    _ballTexture,
-                    screenPosition,
-                    null,
-                    Microsoft.Xna.Framework.Color.White,
-                    0f,
-                    new Vector2(_ballTexture.Width / 2, _ballTexture.Height / 2),
-                    Vector2.One,
-                    SpriteEffects.None,
-                    0f
-                );
-            }
-            _spriteBatch.End();
 
             // Call BeforeLayout first to set things up
             _imGuiRenderer.BeforeLayout(gameTime);
@@ -152,7 +135,7 @@ namespace MonoPhysics
                 ImGui.SliderFloat("float", ref f, 0.0f, 1.0f, string.Empty);
                 ImGui.ColorEdit3("clear color", ref clear_color);
                 if (ImGui.Button("Test Window")) show_test_window = !show_test_window;
-                if (ImGui.Button("Another Window")) show_another_window = !show_another_window;
+                if (ImGui.Button("Another Window")) show_details_window = !show_details_window;
                 ImGui.Text(string.Format("Application average {0:F3} ms/frame ({1:F1} FPS)", 1000f / ImGui.GetIO().Framerate, ImGui.GetIO().Framerate));
 
                 ImGui.InputText("Text input", _textBuffer, 100);
@@ -162,11 +145,69 @@ namespace MonoPhysics
             }
 
             // 2. Show another simple window, this time using an explicit Begin/End pair
-            if (show_another_window)
+            if (show_details_window)
             {
-                ImGui.SetNextWindowSize(new Num.Vector2(200, 100), ImGuiCond.FirstUseEver);
-                ImGui.Begin("Another Window", ref show_another_window);
-                ImGui.Text("Hello");
+                ImGui.SetNextWindowSize(new Num.Vector2(300, 400), ImGuiCond.FirstUseEver);
+                ImGui.Begin("Physics Bodies Info", ref show_details_window);
+
+                if (ImGui.CollapsingHeader("Boundary Boxes"))
+                {
+                    var body = world.BodyList.First;
+                    if (ImGui.TreeNode("Ground"))
+                    {
+                        var pos = body.Value.GetPosition();
+                        ImGui.Text($"Position: X={pos.X:F2}, Y={pos.Y:F2}");
+                        ImGui.Text($"Width: {Program._config.Width / 64f:F2}m");
+                        ImGui.TreePop();
+                    }
+
+                    body = body.Next;
+                    if (ImGui.TreeNode("Ceiling"))
+                    {
+                        var pos = body.Value.GetPosition();
+                        ImGui.Text($"Position: X={pos.X:F2}, Y={pos.Y:F2}");
+                        ImGui.Text($"Width: {Program._config.Width / 64f:F2}m");
+                        ImGui.TreePop();
+                    }
+
+                    body = body.Next;
+                    if (ImGui.TreeNode("Left Wall"))
+                    {
+                        var pos = body.Value.GetPosition();
+                        ImGui.Text($"Position: X={pos.X:F2}, Y={pos.Y:F2}");
+                        ImGui.Text($"Height: {Program._config.Height / 64f:F2}m");
+                        ImGui.TreePop();
+                    }
+
+                    body = body.Next;
+                    if (ImGui.TreeNode("Right Wall"))
+                    {
+                        var pos = body.Value.GetPosition();
+                        ImGui.Text($"Position: X={pos.X:F2}, Y={pos.Y:F2}");
+                        ImGui.Text($"Height: {Program._config.Height / 64f:F2}m");
+                        ImGui.TreePop();
+                    }
+                }
+
+                if (ImGui.CollapsingHeader("Dynamic Bodies"))
+                {
+                    for (int i = 0; i < _circleBodies.Count; i++)
+                    {
+                        var circle = _circleBodies[i];
+                        var position = circle.body.GetPosition();
+                        var velocity = circle.body.LinearVelocity;
+
+                        if (ImGui.TreeNode($"Ball {i + 1}"))
+                        {
+                            ImGui.Text($"Position: X={position.X:F2}, Y={position.Y:F2}");
+                            ImGui.Text($"Velocity: X={velocity.X:F2}, Y={velocity.Y:F2}");
+                            ImGui.Text($"Radius: {circle.radius:F2}");
+                            ImGui.Text($"Body Type: {circle.body.BodyType}");
+                            ImGui.TreePop();
+                        }
+                    }
+                }
+
                 ImGui.End();
             }
 
@@ -272,7 +313,7 @@ namespace MonoPhysics
             float width = Program._config.Width / 64f; // Convert to meters
             float height = Program._config.Height / 64f; // Convert to meters
 
-            // Create ground
+            // Ground (bottom wall) - horizontal
             BodyDef groundBodyDef = new BodyDef();
             groundBodyDef.Position.Set(0, height);
             Body groundBody = world.CreateBody(groundBodyDef);
@@ -280,7 +321,7 @@ namespace MonoPhysics
             groundBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(width, 0));
             groundBody.CreateFixture(groundBox, 0);
 
-            // Create ceiling
+            // Ceiling (top wall) - horizontal
             BodyDef ceilingBodyDef = new BodyDef();
             ceilingBodyDef.Position.Set(0, 0);
             Body ceilingBody = world.CreateBody(ceilingBodyDef);
@@ -288,28 +329,51 @@ namespace MonoPhysics
             ceilingBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(width, 0));
             ceilingBody.CreateFixture(ceilingBox, 0);
 
-            // Create left wall
+            // Left wall - vertical
             BodyDef leftWallBodyDef = new BodyDef();
             leftWallBodyDef.Position.Set(0, 0);
             Body leftWallBody = world.CreateBody(leftWallBodyDef);
             EdgeShape leftWallBox = new EdgeShape();
-            leftWallBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(width, 0));
+            leftWallBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(0, height));
             leftWallBody.CreateFixture(leftWallBox, 0);
 
-            // Create right wall
+            // Right wall - vertical
             BodyDef rightWallBodyDef = new BodyDef();
             rightWallBodyDef.Position.Set(width, 0);
             Body rightWallBody = world.CreateBody(rightWallBodyDef);
             EdgeShape rightWallBox = new EdgeShape();
-            rightWallBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(width, 0));
+            rightWallBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(0, height));
             rightWallBody.CreateFixture(rightWallBox, 0);
-            Program._log.Debug($"[CREATE] Bounds created: Ground, Ceiling, Left Wall, Right Wall");
+        }
+
+        private void DrawBalls()
+        {
+            _spriteBatch.Begin();
+            foreach (var circle in _circleBodies)
+            {
+                var position = circle.body.GetPosition();
+                var screenPosition = new Vector2(position.X * 64f, position.Y * 64f); // Convert to pixels
+                _spriteBatch.Draw(
+                    _ballTexture,
+                    screenPosition,
+                    null,
+                    Microsoft.Xna.Framework.Color.White,
+                    0f,
+                    new Vector2(_ballTexture.Width / 2, _ballTexture.Height / 2),
+                    Vector2.One,
+                    SpriteEffects.None,
+                    0f
+                );
+            }
+            _spriteBatch.End();
         }
 
         private void DrawBounds()
         {
             float width = Program._config.Width;
             float height = Program._config.Height;
+
+            _spriteBatch.Begin();
 
             // Draw ground
             _spriteBatch.Draw(_boundTexture, new Rectangle(0, (int)height - 1, (int)width, 1), Microsoft.Xna.Framework.Color.Red);
@@ -322,6 +386,8 @@ namespace MonoPhysics
 
             // Draw right wall
             _spriteBatch.Draw(_boundTexture, new Rectangle((int)width - 1, 0, 1, (int)height), Microsoft.Xna.Framework.Color.Red);
+
+            _spriteBatch.End();
         }
 
         #endregion Private Methods
