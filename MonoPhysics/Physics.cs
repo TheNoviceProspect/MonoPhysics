@@ -7,6 +7,7 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Num = System.Numerics;
 
 namespace MonoPhysics
@@ -278,12 +279,17 @@ namespace MonoPhysics
         private void CreateBalls()
         {
             Random random = new Random();
+            float padding = Program._config.BoundaryPadding;
+            float minX = padding;
+            float maxX = Program._config.Width - padding;
+            float minY = padding;
+            float maxY = Program._config.Height - padding;
 
             // Create 5 circles
             for (int i = 0; i < 5; i++)
             {
-                float x = (float)(random.NextDouble() * Program._config.Width);
-                float y = (float)(random.NextDouble() * Program._config.Height);
+                float x = minX + (float)(random.NextDouble() * (maxX - minX));
+                float y = minY + (float)(random.NextDouble() * (maxY - minY));
 
                 BodyDef bodyDef = new BodyDef();
                 bodyDef.Position.Set(x / 64f, y / 64f); // Convert to meters
@@ -296,12 +302,10 @@ namespace MonoPhysics
                 body.CreateFixture(fixtureDef);
                 body.BodyType = BodyType.DynamicBody;
 
-                // Set random initial velocity
-                float velocityX = (float)(random.NextDouble() * 2 - 1); // Random value between -1 and 1
-                float velocityY = (float)(random.NextDouble() * 2 - 1); // Random value between -1 and 1
+                float velocityX = (float)(random.NextDouble() * 2 - 1);
+                float velocityY = (float)(random.NextDouble() * 2 - 1);
                 body.SetLinearVelocity(new System.Numerics.Vector2(velocityX, velocityY));
 
-                // Store the bodies
                 CircleBody circle = new CircleBody(body, BaseRadius);
                 _circleBodies.Add(circle);
                 Program._log.Debug($"[CREATE] New CircleBody[{i + 1}] at X:{circle.body.GetPosition().X} Y:{circle.body.GetPosition().Y} with r{circle.radius}");
@@ -310,11 +314,11 @@ namespace MonoPhysics
 
         private void CreateBounds()
         {
-            float padding = 20f / 64f; // 20 pixels converted to meters
-            float width = (Program._config.Width / 64f) - (padding * 2); // Adjust width for padding
-            float height = (Program._config.Height / 64f) - (padding * 2); // Adjust height for padding
+            float padding = Program._config.BoundaryPadding / 64f; // Convert to meters
+            float width = (Program._config.Width / 64f) - (padding * 2);
+            float height = (Program._config.Height / 64f) - (padding * 2);
 
-            // Ground (bottom wall) - horizontal, moved up by padding
+            // Ground (bottom wall) - horizontal
             BodyDef groundBodyDef = new BodyDef();
             groundBodyDef.Position.Set(padding, height);
             Body groundBody = world.CreateBody(groundBodyDef);
@@ -322,7 +326,7 @@ namespace MonoPhysics
             groundBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(width, 0));
             groundBody.CreateFixture(groundBox, 0);
 
-            // Ceiling (top wall) - horizontal, moved down by padding
+            // Ceiling (top wall) - horizontal
             BodyDef ceilingBodyDef = new BodyDef();
             ceilingBodyDef.Position.Set(padding, padding);
             Body ceilingBody = world.CreateBody(ceilingBodyDef);
@@ -330,35 +334,37 @@ namespace MonoPhysics
             ceilingBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(width, 0));
             ceilingBody.CreateFixture(ceilingBox, 0);
 
-            // Left wall - vertical, moved right by padding
+            // Left wall - vertical (now exactly between top and bottom)
             BodyDef leftWallBodyDef = new BodyDef();
             leftWallBodyDef.Position.Set(padding, padding);
             Body leftWallBody = world.CreateBody(leftWallBodyDef);
             EdgeShape leftWallBox = new EdgeShape();
-            leftWallBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(0, height));
+            leftWallBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(0, height - padding));
             leftWallBody.CreateFixture(leftWallBox, 0);
 
-            // Right wall - vertical, moved left by padding
+            // Right wall - vertical (now exactly between top and bottom)
             BodyDef rightWallBodyDef = new BodyDef();
             rightWallBodyDef.Position.Set(width + padding, padding);
             Body rightWallBody = world.CreateBody(rightWallBodyDef);
             EdgeShape rightWallBox = new EdgeShape();
-            rightWallBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(0, height));
+            rightWallBox.SetTwoSided(new System.Numerics.Vector2(0, 0), new System.Numerics.Vector2(0, height - padding));
             rightWallBody.CreateFixture(rightWallBox, 0);
         }
 
         private void DrawBalls()
         {
-            Body currentBody = world.GetBodyList();
+            var currentNode = world.BodyList.First;
+
             // Skip the four boundary bodies
             for (int i = 0; i < 4; i++)
             {
-                currentBody = currentBody.GetNext();
+                currentNode = currentNode.Next;
             }
-
-            while (currentBody != null)
+            _spriteBatch.Begin();
+            while (currentNode != null)
             {
-                var fixture = currentBody.GetFixtureList();
+                var currentBody = currentNode.Value;
+                var fixture = currentBody.FixtureList.FirstOrDefault();
                 if (fixture?.Shape is CircleShape circle)
                 {
                     var position = currentBody.GetPosition();
@@ -368,7 +374,7 @@ namespace MonoPhysics
                         _ballTexture,
                         screenPosition,
                         null,
-                        Color.White,
+                        Microsoft.Xna.Framework.Color.White,
                         currentBody.GetAngle(),
                         new Vector2(_ballTexture.Width / 2, _ballTexture.Height / 2),
                         Vector2.One,
@@ -376,19 +382,22 @@ namespace MonoPhysics
                         0f
                     );
                 }
-                currentBody = currentBody.GetNext();
+                currentNode = currentNode.Next;
             }
+            _spriteBatch.End();
         }
 
         private void DrawBounds()
         {
             int thickness = 2;
-            Body currentBody = world.GetBodyList();
+            var currentNode = world.BodyList.First;
 
-            while (currentBody != null)
+            _spriteBatch.Begin();
+            while (currentNode != null)
             {
+                var currentBody = currentNode.Value;
                 // Get the fixture and its shape
-                var fixture = currentBody.GetFixtureList();
+                var fixture = currentBody.FixtureList.FirstOrDefault();
                 if (fixture?.Shape is EdgeShape edge)
                 {
                     // Convert Box2D coordinates to screen coordinates (multiply by 64f)
@@ -402,10 +411,11 @@ namespace MonoPhysics
                         (pos.Y + edge.Vertex2.Y) * 64f
                     );
 
-                    _spriteBatch.DrawLine(vertex1, vertex2, Color.Red, thickness);
+                    _spriteBatch.DrawLine(vertex1, vertex2, Microsoft.Xna.Framework.Color.Red, thickness);
                 }
-                currentBody = currentBody.GetNext();
+                currentNode = currentNode.Next;
             }
+            _spriteBatch.End();
         }
 
         #endregion Private Methods

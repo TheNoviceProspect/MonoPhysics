@@ -19,7 +19,6 @@ namespace MonoPhysics
             Vector2 delta = end - start;
             float angle = (float)Math.Atan2(delta.Y, delta.X);
             float length = delta.Length();
-            spriteBatch.Begin();
             spriteBatch.Draw(
                 GetPixelTexture(spriteBatch.GraphicsDevice),
                 start,
@@ -31,7 +30,6 @@ namespace MonoPhysics
                 SpriteEffects.None,
                 0f
             );
-            spriteBatch.End();
         }
 
         #endregion Public Methods

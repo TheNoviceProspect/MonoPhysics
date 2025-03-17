@@ -13,12 +13,15 @@ namespace MonoPhysics.Core.Configuration
 
         #region Properties
 
+        public float BoundaryPadding { get; set; } = 20f;
         public bool Fullscreen { get; set; } = false;
         public int Height { get; set; } = 720;
         public int LogFilesToKeep { get; set; } = 5;
         public int Width { get; set; } = 1280;
 
         #endregion Properties
+
+        // Default value of 20 pixels
 
         #region Public Methods
 
